@@ -1,2 +1,49 @@
 //Draft
+import tensorflow as tf
+from tensorflow.keras import layers, models
+import numpy as np
+import matplotlib.pyplot as plt
+import os
 
+print("#1: CUSTOM CNN")
+print("===================================")
+
+# 1. BASIC CONFIGURATION
+IMG_HEIGHT = 224
+IMG_WIDTH = 224
+BATCH_SIZE = 32
+EPOCHS = 10
+
+print(f" Image size: {IMG_HEIGHT}x{IMG_WIDTH}")
+print(f" Batch size: {BATCH_SIZE}")
+
+# 2. DATA GENERATOR SETUP (handles image loading & preprocessing)
+train_datagen = tf.keras.preprocessing.image.ImageDataGenerator(
+    rescale=1./255,           # Normalize pixel values (0-255 → 0-1)
+    rotation_range=20,        # Data augmentation: rotate images
+    width_shift_range=0.2,    # Data augmentation: shift horizontally
+    height_shift_range=0.2,   # Data augmentation: shift vertically
+    horizontal_flip=True,     # Data augmentation: flip horizontally
+    validation_split=0.2      # Use 20% of data for validation
+)
+
+test_datagen = tf.keras.preprocessing.image.ImageDataGenerator(
+    rescale=1./255            # Only normalize for test data
+)
+
+print("✅ Data generators created")
+
+# 3. DATASET EXPLORATION - Find where your data actually is
+print("\n🔍 EXPLORING DATASET STRUCTURE:")
+print("Current folders in /content/:")
+for item in os.listdir('/content/'):
+    item_path = f"/content/{item}"
+    if os.path.isdir(item_path):
+        print(f"📁 {item}/")
+        try:
+            sub_items = os.listdir(item_path)
+            # Look for train/test folders or benign/malignant folders
+            if 'train' in sub_items or 'test' in sub_items or 'benign' in sub_items:
+                print(f"   → Contains: {sub_items}")
+        except:
+            pass
