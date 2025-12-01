@@ -145,7 +145,7 @@ print("="*50)
 
 # Save the model
 model.save('fighter1_custom_cnn.h5')
-print("💾 Model saved as 'fighter1_custom_cnn.h5'")
+print(" Model saved as 'fighter1_custom_cnn.h5'")
 
 
 
