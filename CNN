@@ -144,8 +144,8 @@ print(f" Next: Replace with real skin cancer images!")
 print("="*50)
 
 # Save the model
-model.save('fighter1_custom_cnn.h5')
-print(" Model saved as 'fighter1_custom_cnn.h5'")
+model.save('custom_cnn.h5')
+print(" Model saved as 'custom_cnn.h5'")
 
 
 
