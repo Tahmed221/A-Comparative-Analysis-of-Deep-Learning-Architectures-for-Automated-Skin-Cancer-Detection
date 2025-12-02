@@ -52,30 +52,30 @@ print("\n BUILDING CNN ARCHITECTURE...")
 
 model = models.Sequential([
     # First Convolutional Block
-    layers.Conv2D(32, (3, 3), activation='relu', input_shape=(IMG_HEIGHT, IMG_WIDTH, 3)),
-    layers.MaxPooling2D((2, 2)),
+    layers.Conv2D(32, (3, 3), activation='relu', input_shape=(IMG_HEIGHT, IMG_WIDTH, 3)), // This is Layer 1
+    layers.MaxPooling2D((2, 2)),                                                          // Reduce the size
 
     # Second Convolutional Block
-    layers.Conv2D(64, (3, 3), activation='relu'),
-    layers.MaxPooling2D((2, 2)),
+    layers.Conv2D(64, (3, 3), activation='relu'),                                         // This is Layer 2
+    layers.MaxPooling2D((2, 2)),                                                          // Reduce the size again
 
-    # Third Convolutional Block
-    layers.Conv2D(64, (3, 3), activation='relu'),
+    # Third Convolutional Block                                                           // This is Layer 3
+    layers.Conv2D(64, (3, 3), activation='relu'),                                         // Converts to 1D
 
     # Classifier
     layers.Flatten(),
-    layers.Dense(64, activation='relu'),
-    layers.Dense(1, activation='sigmoid')  # Output: 0=benign, 1=malignant
+    layers.Dense(64, activation='relu'),                                                 // Thinks about the patterns
+    layers.Dense(1, activation='sigmoid')  # Output: 0=benign, 1=malignant               // Gives Final Decision
 ])
 
 print(" Model architecture built!")
 model.summary()
 
 # ==================== COMPILE MODEL ====================
-print("\n⚙️  COMPILING MODEL...")
+print("\n  COMPILING MODEL...")                                                         // Adam Algorithm (learning rates)
 model.compile(
     optimizer='adam',
-    loss='binary_crossentropy',
+    loss='binary_crossentropy',                                                        // Binary Cross-Entropy (True / False)
     metrics=['accuracy', 'Precision', 'Recall']
 )
 print(" Model compiled!")
