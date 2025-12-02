@@ -133,7 +133,7 @@ plt.grid(True)
 plt.tight_layout()
 plt.show()
 
-# ==================== FINAL SUMMARY ====================
+# ==================== RESULTS ====================
 print("\n" + "="*50)
 print("CUSTOM CNN COMPLETE!")
 print("="*50)
