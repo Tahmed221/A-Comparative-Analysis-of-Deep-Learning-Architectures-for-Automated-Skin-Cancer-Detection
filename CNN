@@ -25,7 +25,7 @@ print(f"⏱  Epochs: {EPOCHS}")
 
 # ==================== CREATE SYNTHETIC DATA ====================
 print("\n CREATING SYNTHETIC TRAINING DATA...")
-print("   (We'll replace this with real skin cancer data later)")
+print("   (We'll replace this with new skin cancer data later)")
 
 # Create fake data for demonstration
 num_train = 1000
