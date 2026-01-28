@@ -1,151 +1,368 @@
 # =============================================
-# FIGHTER 1: CUSTOM CNN - COMPLETE CODE
+# CUSTOM CNN WITH YOUR GOOGLE DRIVE DATA 
+# This script implements a custom Convolutional Neural Network (CNN) from scratch
+# for binary classification of skin cancer images (benign vs malignant)
 # =============================================
 
+# IMPORT NECESSARY LIBRARIES
+# TensorFlow/Keras for deep learning, Matplotlib for visualization,
+# NumPy for numerical operations, and OS for file system operations
 import tensorflow as tf
 from tensorflow.keras import layers, models
+from tensorflow.keras.metrics import Precision, Recall
 import matplotlib.pyplot as plt
 import numpy as np
 import os
-from sklearn.metrics import classification_report, confusion_matrix
-import seaborn as sns
 
-print("CUSTOM CNN")
-print("==========================")
+print("CUSTOM CNN WITH REAL SKIN CANCER DATA")
+print("==================================================")
+
+# ==================== CONNECT TO GOOGLE DRIVE ====================
+# Google Colab provides temporary storage; mounting Google Drive ensures
+# persistent storage for datasets and models across sessions
+from google.colab import drive
+print("\nMOUNTING GOOGLE DRIVE...")
+drive.mount('/content/drive')
+print("Google Drive connected!")
+
+# ==================== YOUR EXACT PATHS ====================
+print("\nUSING YOUR DATASET PATHS:")
+
+# Define the base path where your dataset is stored in Google Drive
+# This structure assumes the dataset follows the standard organization:
+# DataSet/train/{benign,malignant} and DataSet/test/{benign,malignant}
+base_path = "/content/drive/MyDrive/DataSet"
+
+# Construct full paths to each class directory
+# This organization makes it easy for TensorFlow's ImageDataGenerator to load images
+train_benign_path = f"{base_path}/train/benign"
+train_malignant_path = f"{base_path}/train/malignant"
+test_benign_path = f"{base_path}/test/benign"
+test_malignant_path = f"{base_path}/test/malignant"
+
+print(f"Base path: {base_path}")
+print(f"Training benign: {train_benign_path}")
+print(f"Training malignant: {train_malignant_path}")
+print(f"Testing benign: {test_benign_path}")
+print(f"Testing malignant: {test_malignant_path}")
+
+# ==================== VERIFY PATHS EXIST ====================
+print("\nVERIFYING PATHS...")
+
+# Create a list of all paths to check for existence
+# This prevents runtime errors if files are missing or paths are incorrect
+paths_to_check = [
+    ("Training Benign", train_benign_path),
+    ("Training Malignant", train_malignant_path),
+    ("Testing Benign", test_benign_path),
+    ("Testing Malignant", test_malignant_path)
+]
+
+all_paths_exist = True
+for label, path in paths_to_check:
+    if os.path.exists(path):
+        # Count only image files (common formats) to verify dataset integrity
+        num_images = len([f for f in os.listdir(path) if f.lower().endswith(('.png', '.jpg', '.jpeg'))])
+        print(f"{label}: {path} ({num_images} images)")
+    else:
+        print(f"{label}: {path} - NOT FOUND!")
+        all_paths_exist = False
+
+# If any path doesn't exist, explore the base directory to help user debug
+if not all_paths_exist:
+    print("\nSome paths not found. Checking what's actually in DataSet...")
+    print(f"Contents of {base_path}:")
+    if os.path.exists(base_path):
+        for item in os.listdir(base_path):
+            item_path = os.path.join(base_path, item)
+            if os.path.isdir(item_path):
+                print(f"{item}/")
+            else:
+                print(f"{item}")
+    exit()
 
 # ==================== CONFIGURATION ====================
-IMG_HEIGHT = 64  # Using smaller images for faster training
+# Image dimensions: Starting with 64x64 for faster training
+# Can increase to 224x224 for better accuracy once initial testing is complete
+IMG_HEIGHT = 64
 IMG_WIDTH = 64
+
+# Batch size: 32 is standard for balancing memory usage and gradient stability
 BATCH_SIZE = 32
-EPOCHS = 5  # Start with few epochs to test
 
-print(f" Image size: {IMG_HEIGHT}x{IMG_WIDTH}")
-print(f" Batch size: {BATCH_SIZE}")
-print(f"⏱  Epochs: {EPOCHS}")
+# Epochs: 10 epochs for initial training; can increase for better convergence
+EPOCHS = 10
 
-# ==================== CREATE SYNTHETIC DATA ====================
-print("\n CREATING SYNTHETIC TRAINING DATA...")
-print("   (We'll replace this with new skin cancer data later)")
+print(f"\nCONFIGURATION:")
+print(f"Image size: {IMG_HEIGHT}px × {IMG_WIDTH}px")
+print(f"Batch size: {BATCH_SIZE}")
+print(f"Epochs: {EPOCHS}")
 
-# Create fake data for demonstration
-num_train = 1000
-num_test = 200
+# ==================== CREATE DATA GENERATORS ====================
+print("\nCREATING DATA PIPELINE...")
 
-# Generate random images (simulating skin lesions)
-x_train = np.random.rand(num_train, IMG_HEIGHT, IMG_WIDTH, 3).astype(np.float32)
-y_train = np.random.randint(0, 2, size=(num_train, 1))
+from tensorflow.keras.preprocessing.image import ImageDataGenerator
 
-x_test = np.random.rand(num_test, IMG_HEIGHT, IMG_WIDTH, 3).astype(np.float32)
-y_test = np.random.randint(0, 2, size=(num_test, 1))
+# Training data generator with augmentation
+# Augmentation creates variations of training images to prevent overfitting
+# and improve model generalization to unseen data
+train_datagen = ImageDataGenerator(
+    rescale=1./255,           # Normalize pixel values from 0-255 to 0-1 for faster convergence
+    rotation_range=20,        # Random rotation up to 20 degrees to account for camera angle variations
+    width_shift_range=0.2,    # Random horizontal shift to handle positioning variations
+    height_shift_range=0.2,   # Random vertical shift for similar reasons
+    horizontal_flip=True,     # Mirror images left-right (skin lesions can appear on either side)
+    validation_split=0.2      # Reserve 20% of training data for validation during training
+)
 
-# Normalize to 0-1 range
-x_train = x_train / 255.0
-x_test = x_test / 255.0
+# Testing data generator without augmentation
+# Test data should not be augmented to get an accurate measure of real-world performance
+test_datagen = ImageDataGenerator(rescale=1./255)
 
-print(f" Synthetic data created:")
-print(f"   Training: {x_train.shape} images, {y_train.shape} labels")
-print(f"   Testing: {x_test.shape} images, {y_test.shape} labels")
-print(f"   Classes: Benign (0) vs Malignant (1)")
+# ==================== LOAD TRAINING DATA ====================
+print("\nLOADING TRAINING DATA...")
+
+# Use the parent 'train' directory (not individual class directories)
+# ImageDataGenerator automatically detects class folders and labels them
+train_dir = f"{base_path}/train"
+
+# Create training data generator
+# 'binary' class mode is used since we have two classes (benign/malignant)
+train_generator = train_datagen.flow_from_directory(
+    train_dir,
+    target_size=(IMG_HEIGHT, IMG_WIDTH),  # Resize all images to consistent dimensions
+    batch_size=BATCH_SIZE,
+    class_mode='binary',      # Labels as 0 (benign) and 1 (malignant)
+    subset='training',        # Use 80% of data for training (from validation_split)
+    shuffle=True              # Shuffle data each epoch to prevent order bias
+)
+
+# Create validation data generator
+# Validation data is used during training to monitor overfitting
+validation_generator = train_datagen.flow_from_directory(
+    train_dir,
+    target_size=(IMG_HEIGHT, IMG_WIDTH),
+    batch_size=BATCH_SIZE,
+    class_mode='binary',
+    subset='validation',      # Use 20% of data for validation
+    shuffle=True
+)
+
+print(f"Training samples: {train_generator.samples}")
+print(f"Validation samples: {validation_generator.samples}")
+print(f"Class mapping: {train_generator.class_indices}")  # Shows which folder maps to which label
+
+# ==================== LOAD TESTING DATA ====================
+print("\nLOADING TESTING DATA...")
+
+test_dir = f"{base_path}/test"
+
+# Create testing data generator
+# Testing data is completely separate from training/validation data
+test_generator = test_datagen.flow_from_directory(
+    test_dir,
+    target_size=(IMG_HEIGHT, IMG_WIDTH),
+    batch_size=BATCH_SIZE,
+    class_mode='binary',
+    shuffle=False  # Don't shuffle test data to maintain order for analysis
+)
+
+print(f"Test samples: {test_generator.samples}")
+print(f"Class mapping: {test_generator.class_indices}")
+
+# ==================== SHOW SAMPLE IMAGES ====================
+print("\nDISPLAYING SAMPLE IMAGES...")
+
+# Get a batch of training images to visualize
+# This helps verify data loading is working correctly
+train_images, train_labels = next(train_generator)
+
+plt.figure(figsize=(12, 6))
+for i in range(8):  # Display 8 sample images
+    plt.subplot(2, 4, i+1)
+    plt.imshow(train_images[i])
+    # Convert numerical labels back to human-readable class names
+    plt.title(f"{'BENIGN' if train_labels[i]==0 else 'MALIGNANT'}")
+    plt.axis('off')
+plt.tight_layout()
+plt.show()
 
 # ==================== BUILD CNN MODEL ====================
-print("\n BUILDING CNN ARCHITECTURE...")
+print("\nBUILDING CNN ARCHITECTURE...")
 
+# Create a Sequential model (linear stack of layers)
+# This custom CNN has 3 convolutional blocks for feature extraction
+# followed by 2 dense layers for classification
 model = models.Sequential([
-    # First Convolutional Block
-    layers.Conv2D(32, (3, 3), activation='relu', input_shape=(IMG_HEIGHT, IMG_WIDTH, 3)), // This is Layer 1
-    layers.MaxPooling2D((2, 2)),                                                          // Reduce the size
-
-    # Second Convolutional Block
-    layers.Conv2D(64, (3, 3), activation='relu'),                                         // This is Layer 2
-    layers.MaxPooling2D((2, 2)),                                                          // Reduce the size again
-
-    # Third Convolutional Block                                                           // This is Layer 3
-    layers.Conv2D(64, (3, 3), activation='relu'),                                         // Converts to 1D
-
-    # Classifier
-    layers.Flatten(),
-    layers.Dense(64, activation='relu'),                                                 // Thinks about the patterns
-    layers.Dense(1, activation='sigmoid')  # Output: 0=benign, 1=malignant               // Gives Final Decision
+    # Block 1: First convolutional layer with 32 filters
+    # Detects basic features like edges, colors, and textures
+    layers.Conv2D(32, (3, 3), activation='relu', input_shape=(IMG_HEIGHT, IMG_WIDTH, 3)),
+    layers.MaxPooling2D((2, 2)),  # Reduces spatial dimensions by half (64x64 → 32x32)
+    
+    # Block 2: Second convolutional layer with 64 filters
+    # Detects more complex patterns by combining basic features
+    layers.Conv2D(64, (3, 3), activation='relu'),
+    layers.MaxPooling2D((2, 2)),  # Further reduces dimensions (32x32 → 16x16)
+    
+    # Block 3: Third convolutional layer with 64 filters
+    # Detects high-level patterns specific to skin lesions
+    layers.Conv2D(64, (3, 3), activation='relu'),
+    
+    # Classification section
+    layers.Flatten(),  # Convert 3D feature maps to 1D vector for dense layers
+    layers.Dense(64, activation='relu'),  # Fully connected layer for decision making
+    layers.Dense(1, activation='sigmoid')  # Output layer: sigmoid for binary classification
 ])
 
-print(" Model architecture built!")
-model.summary()
+print("Model architecture built!")
+model.summary()  # Print layer-by-layer summary of model architecture
 
 # ==================== COMPILE MODEL ====================
-print("\n  COMPILING MODEL...")                                                         // Adam Algorithm (learning rates)
+print("\nCOMPILING MODEL...")
+
+# Compile the model with optimizer, loss function, and metrics
+# This prepares the model for training
 model.compile(
-    optimizer='adam',
-    loss='binary_crossentropy',                                                        // Binary Cross-Entropy (True / False)
-    metrics=['accuracy', 'Precision', 'Recall']
+    optimizer='adam',  # Adaptive Moment Estimation - popular optimizer with adaptive learning rates
+    loss='binary_crossentropy',  # Standard loss function for binary classification
+    metrics=[
+        'accuracy',                     # Overall correctness
+        Precision(name='precision'),    # Proportion of positive identifications that were correct
+        Recall(name='recall'),          # Proportion of actual positives that were identified correctly
+    ]
 )
-print(" Model compiled!")
+
+print("Model compiled! Ready for training.")
 
 # ==================== TRAIN MODEL ====================
-print("\n TRAINING MODEL...")
-print("   This will take a minute...")
+print("\nTRAINING ON REAL SKIN CANCER IMAGES...")
+print("This will take a few minutes...")
 
+# Train the model using the training data generator
+# Steps per epoch ensures we use all training data each epoch
 history = model.fit(
-    x_train, y_train,
+    train_generator,
+    steps_per_epoch=train_generator.samples // BATCH_SIZE,  # Number of batches per epoch
     epochs=EPOCHS,
-    batch_size=BATCH_SIZE,
-    validation_split=0.2,
-    verbose=1
+    validation_data=validation_generator,
+    validation_steps=validation_generator.samples // BATCH_SIZE,
+    verbose=1  # Show progress bar
 )
 
-print(" Training complete!")
+print("Training complete!")
 
-# ==================== EVALUATE MODEL ====================
-print("\n EVALUATING MODEL...")
+# ==================== EVALUATE ON TEST DATA ====================
+print("\nEVALUATING ON TEST DATA...")
 
-# Test accuracy
-test_loss, test_acc, test_precision, test_recall = model.evaluate(x_test, y_test, verbose=0)
-print(f" Test Accuracy: {test_acc:.2%}")
-print(f" Test Precision: {test_precision:.2%}")
-print(f" Test Recall: {test_recall:.2%}")
+# Evaluate model on unseen test data
+# This gives the final performance metrics for the model
+test_results = model.evaluate(test_generator, verbose=0)
 
-# Make predictions
-y_pred = (model.predict(x_test) > 0.5).astype("int32")
+# The evaluate method returns metrics in the same order as compile()
+if len(test_results) == 4:
+    test_loss, test_acc, test_precision, test_recall = test_results
+    print(f"TEST RESULTS:")
+    print(f"   Accuracy:  {test_acc:.2%}")      # Overall performance
+    print(f"   Precision: {test_precision:.2%}")  # How reliable positive predictions are
+    print(f"   Recall:    {test_recall:.2%}")     # How many actual positives were found
+    print(f"   Loss:      {test_loss:.4f}")       # How far predictions are from true values
+else:
+    print(f"Unexpected number of metrics: {len(test_results)}")
+    print(f"Test results: {test_results}")
 
 # ==================== VISUALIZE RESULTS ====================
-print("\n VISUALIZING RESULTS...")
+print("\nCREATING PERFORMANCE VISUALIZATIONS...")
 
-# Plot training history
-plt.figure(figsize=(12, 4))
+plt.figure(figsize=(15, 5))
 
-plt.subplot(1, 2, 1)
-plt.plot(history.history['accuracy'], label='Training Accuracy')
-plt.plot(history.history['val_accuracy'], label='Validation Accuracy')
+# Plot 1: Accuracy over epochs
+# Shows if model is learning and if it's overfitting (training >> validation)
+plt.subplot(1, 3, 1)
+plt.plot(history.history['accuracy'], label='Training Accuracy', marker='o')
+plt.plot(history.history['val_accuracy'], label='Validation Accuracy', marker='s')
 plt.title('Model Accuracy')
 plt.xlabel('Epoch')
 plt.ylabel('Accuracy')
 plt.legend()
-plt.grid(True)
+plt.grid(True, alpha=0.3)
 
-plt.subplot(1, 2, 2)
-plt.plot(history.history['loss'], label='Training Loss')
-plt.plot(history.history['val_loss'], label='Validation Loss')
+# Plot 2: Loss over epochs
+# Loss should decrease over time; validation loss increasing indicates overfitting
+plt.subplot(1, 3, 2)
+plt.plot(history.history['loss'], label='Training Loss', marker='o')
+plt.plot(history.history['val_loss'], label='Validation Loss', marker='s')
 plt.title('Model Loss')
 plt.xlabel('Epoch')
 plt.ylabel('Loss')
 plt.legend()
-plt.grid(True)
+plt.grid(True, alpha=0.3)
+
+# Plot 3: Precision & Recall over epochs
+# Medical applications need both high precision (avoid false alarms) and high recall (catch all cases)
+plt.subplot(1, 3, 3)
+plt.plot(history.history['precision'], label='Precision', marker='o')
+plt.plot(history.history['recall'], label='Recall', marker='s')
+plt.title('Precision & Recall')
+plt.xlabel('Epoch')
+plt.ylabel('Score')
+plt.legend()
+plt.grid(True, alpha=0.3)
 
 plt.tight_layout()
 plt.show()
 
-# ==================== RESULTS ====================
-print("\n" + "="*50)
-print("CUSTOM CNN COMPLETE!")
-print("="*50)
-print(f" Final Test Accuracy: {test_acc:.2%}")
-print(f" Architecture: 3 Conv blocks → Flatten → 2 Dense layers")
-print(f" Note: Currently using SYNTHETIC data")
-print(f" Next: Replace with real skin cancer images!")
-print("="*50)
+# ==================== MAKE PREDICTIONS ====================
+print("\nMAKING SAMPLE PREDICTIONS...")
 
-# Save the model
-model.save('custom_cnn.h5')
-print(" Model saved as 'custom_cnn.h5'")
+# Get a batch of test images to make predictions on
+test_images, test_true_labels = next(test_generator)
+
+# Make predictions on the test batch
+predictions = model.predict(test_images, verbose=0)
+
+# Convert prediction probabilities (0-1) to binary labels (0 or 1)
+predicted_labels = (predictions > 0.5).astype(int)
+
+# Display sample predictions with visual feedback
+plt.figure(figsize=(15, 6))
+for i in range(10):  # Show 10 sample predictions
+    plt.subplot(2, 5, i+1)
+    plt.imshow(test_images[i])
+    
+    # Convert numerical labels to class names
+    true_label = "BENIGN" if test_true_labels[i] == 0 else "MALIGNANT"
+    pred_label = "BENIGN" if predicted_labels[i] == 0 else "MALIGNANT"
+    
+    # Calculate confidence: probability of the predicted class
+    confidence = predictions[i][0] if pred_label == "MALIGNANT" else 1 - predictions[i][0]
+    
+    # Color code: green for correct, red for incorrect
+    color = "green" if true_label == pred_label else "red"
+    
+    plt.title(f"True: {true_label}\nPred: {pred_label}\n({confidence:.1%})", 
+              color=color, fontsize=9)
+    plt.axis('off')
+
+plt.tight_layout()
+plt.show()
+
+# ==================== SAVE MODEL ====================
+print("\nSAVING MODEL...")
+
+# Save the trained model to Google Drive for later use
+# H5 format preserves architecture, weights, and training configuration
+model.save('/content/drive/MyDrive/DataSet/fighter1_trained_model.h5')
+print("Model saved to Google Drive: /content/drive/MyDrive/DataSet/fighter1_trained_model.h5")
+
+# ==================== FINAL SUMMARY ====================
+print("\n" + "="*60)
+print("CUSTOM CNN TRAINING COMPLETE!")
+print("="*60)
+print(f"Dataset: {train_generator.samples + test_generator.samples} real skin images")
+print(f"Test Accuracy: {test_acc:.2%}")
+print(f"Architecture: 3 Conv layers → 2 Dense layers")
+print(f"Model saved to Google Drive")
+print("="*60)
 
 
 
