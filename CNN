@@ -1,10 +1,10 @@
 # =============================================
-# CUSTOM CNN WITH YOUR GOOGLE DRIVE DATA 
-# This script implements a custom Convolutional Neural Network (CNN) from scratch
-# for binary classification of skin cancer images (benign vs malignant)
+# CUSTOM CNN 
+# Convolutional Neural Network (CNN) from scratch
+# Binary classification of skin cancer images (benign vs malignant)
 # =============================================
 
-# IMPORT NECESSARY LIBRARIES
+# IMPORT LIBRARIES
 # TensorFlow/Keras for deep learning, Matplotlib for visualization,
 # NumPy for numerical operations, and OS for file system operations
 import tensorflow as tf
@@ -18,23 +18,21 @@ print("CUSTOM CNN WITH REAL SKIN CANCER DATA")
 print("==================================================")
 
 # ==================== CONNECT TO GOOGLE DRIVE ====================
-# Google Colab provides temporary storage; mounting Google Drive ensures
-# persistent storage for datasets and models across sessions
+# This allows data set to be accessed via Colab
 from google.colab import drive
 print("\nMOUNTING GOOGLE DRIVE...")
 drive.mount('/content/drive')
 print("Google Drive connected!")
 
 # ==================== YOUR EXACT PATHS ====================
-print("\nUSING YOUR DATASET PATHS:")
+print("\nUSING THE DATASET PATHS:")
 
-# Define the base path where your dataset is stored in Google Drive
-# This structure assumes the dataset follows the standard organization:
+# This defines the base path where the dataset is stored in Google Drive
+# This structure assumes the dataset follows the standard organisation:
 # DataSet/train/{benign,malignant} and DataSet/test/{benign,malignant}
 base_path = "/content/drive/MyDrive/DataSet"
 
-# Construct full paths to each class directory
-# This organization makes it easy for TensorFlow's ImageDataGenerator to load images
+# This structure makes it easy for TensorFlow's ImageDataGenerator to load images
 train_benign_path = f"{base_path}/train/benign"
 train_malignant_path = f"{base_path}/train/malignant"
 test_benign_path = f"{base_path}/test/benign"
@@ -82,8 +80,7 @@ if not all_paths_exist:
     exit()
 
 # ==================== CONFIGURATION ====================
-# Image dimensions: Starting with 64x64 for faster training
-# Can increase to 224x224 for better accuracy once initial testing is complete
+# Image dimensions: 64x64 for faster training 
 IMG_HEIGHT = 64
 IMG_WIDTH = 64
 
@@ -105,9 +102,9 @@ from tensorflow.keras.preprocessing.image import ImageDataGenerator
 
 # Training data generator with augmentation
 # Augmentation creates variations of training images to prevent overfitting
-# and improve model generalization to unseen data
+# and improve model generalisation to unseen data
 train_datagen = ImageDataGenerator(
-    rescale=1./255,           # Normalize pixel values from 0-255 to 0-1 for faster convergence
+    rescale=1./255,           # Normalise pixel values from 0-255 to 0-1 for faster convergence
     rotation_range=20,        # Random rotation up to 20 degrees to account for camera angle variations
     width_shift_range=0.2,    # Random horizontal shift to handle positioning variations
     height_shift_range=0.2,   # Random vertical shift for similar reasons
@@ -127,7 +124,7 @@ print("\nLOADING TRAINING DATA...")
 train_dir = f"{base_path}/train"
 
 # Create training data generator
-# 'binary' class mode is used since we have two classes (benign/malignant)
+# 'binary' class mode is used since when theres two classes (benign/malignant)
 train_generator = train_datagen.flow_from_directory(
     train_dir,
     target_size=(IMG_HEIGHT, IMG_WIDTH),  # Resize all images to consistent dimensions
@@ -236,7 +233,6 @@ print("Model compiled! Ready for training.")
 
 # ==================== TRAIN MODEL ====================
 print("\nTRAINING ON REAL SKIN CANCER IMAGES...")
-print("This will take a few minutes...")
 
 # Train the model using the training data generator
 # Steps per epoch ensures we use all training data each epoch
